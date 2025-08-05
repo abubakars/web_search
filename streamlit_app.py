@@ -1,45 +1,37 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
+import re
 
-st.set_page_config(page_title="Web Page Scraper", layout="wide")
+st.set_page_config(page_title="Web Scraper App", layout="wide")
 
-st.title("🌐 Web Page Scraper")
+st.title("🔍 Simple Web Scraper with Streamlit")
 
-# Input section
-url = st.text_input("Enter the URL of the webpage you want to scrape:")
+# --- Input URL ---
+url = st.text_input("Enter a webpage URL:", "https://www.example.com")
 
-tag = st.text_input("Optional: HTML tag to extract (e.g., p, h1, h2, div)", "")
+if st.button("Scrape Webpage"):
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
 
-if st.button("Scrape Now"):
-    if not url.startswith("http"):
-        st.error("Please enter a valid URL starting with http or https")
-    else:
-        try:
-            response = requests.get(url)
-            soup = BeautifulSoup(response.content, "html.parser")
+        # Parse HTML
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-            # Get title
-            title = soup.title.string if soup.title else "No title found"
-            st.subheader("🔖 Page Title:")
-            st.write(title)
+        # Remove script and style tags
+        for tag in soup(["script", "style", "noscript"]):
+            tag.decompose()
 
-            # Extract specific tag or all visible text
-            if tag:
-                elements = soup.find_all(tag)
-                st.subheader(f"📌 All <{tag}> tags:")
-                for i, elem in enumerate(elements):
-                    if elem.text.strip():
-                        st.markdown(f"**{i+1}.** {elem.text.strip()}")
-            else:
-                # Extract visible text
-                for script in soup(["script", "style"]):
-                    script.decompose()
-                text = soup.get_text()
-                lines = [line.strip() for line in text.splitlines()]
-                text_output = "\n".join(line for line in lines if line)
-                st.subheader("📄 Extracted Page Text:")
-                st.text_area("Text Content", value=text_output, height=400)
+        # Extract text and clean
+        raw_text = soup.get_text()
+        cleaned_text = re.sub(r'\s+', ' ', raw_text).strip()
 
-        except Exception as e:
-            st.error(f"Failed to scrape the webpage: {e}")
+        st.success("✅ Scraping complete!")
+        st.subheader("📄 Scraped Text:")
+        st.text_area("Webpage Content", cleaned_text, height=400)
+
+        # --- Download Button ---
+        st.download_button("💾 Download as TXT", data=cleaned_text, file_name="scraped_content.txt")
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"❌ Error: {e}")
