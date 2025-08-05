@@ -1,38 +1,31 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
+import geopandas as gpd
 
-st.set_page_config(page_title="Web Page Scraper", layout="wide")
+# Title
+st.title("🗺️ Niger State Settlement Locations")
 
-st.title("🌐 Web Page Scraper")
-st.write("Enter a URL to scrape its main content.")
+# Function to load and filter data
+@st.cache_data
+def load_data():
+    # Load all settlement points in Nigeria (GeoJSON)
+    url_settlements = "https://bulk.openafrica.net/dataset/nigerian-settlement-points.geojson"
+    settlements = gpd.read_file(url_settlements)
 
-# Input URL
-url = st.text_input("Enter a website URL:", placeholder="https://example.com")
+    # Load Niger State boundary (you'll need a correct GeoJSON link)
+    url_niger_boundary = "https://your_url_to_niger_state_boundary.geojson"
+    niger_boundary = gpd.read_file(url_niger_boundary)
 
-if url:
-    try:
-        # Fetch content
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, "html.parser")
+    # Match coordinate reference systems
+    settlements = settlements.to_crs(niger_boundary.crs)
 
-        # Extract title
-        page_title = soup.title.string if soup.title else "No title found"
-        st.subheader(f"Page Title: {page_title}")
+    # Spatial join to get settlements within Niger State
+    niger_settlements = gpd.sjoin(settlements, niger_boundary, predicate="within")
 
-        # Extract paragraphs
-        paragraphs = soup.find_all("p")
-        if paragraphs:
-            st.markdown("### Page Content:")
-            for para in paragraphs[:30]:  # Show only first 30 paragraphs
-                text = para.get_text(strip=True)
-                if text:
-                    st.write(text)
-        else:
-            st.warning("No paragraph content found on this page.")
+    return niger_settlements
 
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching URL: {e}")
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+# Load and show map
+settlements_in_niger = load_data()
+st.write(f"Total settlements in Niger State: {len(settlements_in_niger)}")
+
+# Display map
+st.map(settlements_in_niger[['geometry']], use_container_width=True)
