@@ -1,37 +1,38 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-import re
 
-st.set_page_config(page_title="Web Scraper App", layout="wide")
+st.set_page_config(page_title="Web Page Scraper", layout="wide")
 
-st.title("🔍 Simple Web Scraper with Streamlit")
+st.title("🌐 Web Page Scraper")
+st.write("Enter a URL to scrape its main content.")
 
-# --- Input URL ---
-url = st.text_input("Enter a webpage URL:", "https://www.example.com")
+# Input URL
+url = st.text_input("Enter a website URL:", placeholder="https://example.com")
 
-if st.button("Scrape Webpage"):
+if url:
     try:
+        # Fetch content
         response = requests.get(url, timeout=10)
         response.raise_for_status()
+        soup = BeautifulSoup(response.content, "html.parser")
 
-        # Parse HTML
-        soup = BeautifulSoup(response.text, 'html.parser')
+        # Extract title
+        page_title = soup.title.string if soup.title else "No title found"
+        st.subheader(f"Page Title: {page_title}")
 
-        # Remove script and style tags
-        for tag in soup(["script", "style", "noscript"]):
-            tag.decompose()
-
-        # Extract text and clean
-        raw_text = soup.get_text()
-        cleaned_text = re.sub(r'\s+', ' ', raw_text).strip()
-
-        st.success("✅ Scraping complete!")
-        st.subheader("📄 Scraped Text:")
-        st.text_area("Webpage Content", cleaned_text, height=400)
-
-        # --- Download Button ---
-        st.download_button("💾 Download as TXT", data=cleaned_text, file_name="scraped_content.txt")
+        # Extract paragraphs
+        paragraphs = soup.find_all("p")
+        if paragraphs:
+            st.markdown("### Page Content:")
+            for para in paragraphs[:30]:  # Show only first 30 paragraphs
+                text = para.get_text(strip=True)
+                if text:
+                    st.write(text)
+        else:
+            st.warning("No paragraph content found on this page.")
 
     except requests.exceptions.RequestException as e:
-        st.error(f"❌ Error: {e}")
+        st.error(f"Error fetching URL: {e}")
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
